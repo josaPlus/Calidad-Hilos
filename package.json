@@ -1,0 +1,14 @@
+{
+  "name": "hilos-app",
+  "version": "1.0.0",
+  "description": "Gestor de Ventas de Hilos - SQLite + MongoDB",
+  "private": true,
+  "scripts": {
+    "dev:backend": "cd backend && npm run dev",
+    "dev:frontend": "cd frontend && npm run dev",
+    "install:all": "npm install && cd backend && npm install && cd ../frontend && npm install",
+    "build:frontend": "cd frontend && npm run build"
+  },
+  "author": "HilosApp",
+  "license": "MIT"
+}

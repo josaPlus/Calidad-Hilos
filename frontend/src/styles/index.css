@@ -1,0 +1,71 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --c-sage:  #6A8D73;
+  --c-mist:  #F4FDD9;
+  --c-leaf:  #E4FFE1;
+  --c-cream: #FFE8C2;
+  --c-amber: #F0A868;
+}
+
+* { box-sizing: border-box; }
+
+html, body, #root { height: 100%; }
+
+body {
+  margin: 0;
+  font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
+  background:
+    radial-gradient(1200px 600px at 10% -10%, #E4FFE1 0%, transparent 60%),
+    radial-gradient(900px 500px at 110% 10%, #FFE8C2 0%, transparent 55%),
+    #F4FDD9;
+  color: #1f2d24;
+  -webkit-font-smoothing: antialiased;
+  min-height: 100vh;
+}
+
+h1, h2, h3, h4 {
+  font-family: 'Fraunces', Georgia, serif;
+  letter-spacing: -0.01em;
+}
+
+/* Scrollbars suaves para coherencia con paleta clara */
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb {
+  background: rgba(106, 141, 115, 0.35);
+  border-radius: 999px;
+}
+::-webkit-scrollbar-thumb:hover { background: rgba(106, 141, 115, 0.55); }
+
+@layer components {
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 px-4 py-2 rounded-xl font-semibold
+           transition-all focus:outline-none focus:ring-2 focus:ring-offset-2
+           focus:ring-offset-mist disabled:opacity-50 disabled:cursor-not-allowed text-sm;
+  }
+  .btn-primary  { @apply btn bg-sage text-white hover:bg-primary-700 focus:ring-sage; }
+  .btn-accent   { @apply btn bg-amber text-stone-900 hover:brightness-95 focus:ring-amber; }
+  .btn-ghost    { @apply btn bg-white/60 text-sage hover:bg-white border border-sage/20; }
+  .btn-danger   { @apply btn bg-red-500 text-white hover:bg-red-600 focus:ring-red-400; }
+
+  .input {
+    @apply w-full px-4 py-2.5 rounded-xl border border-sage/20 bg-white/80 text-stone-800
+           placeholder-stone-400 focus:outline-none focus:border-sage focus:ring-2 focus:ring-sage/30
+           transition;
+  }
+
+  .card {
+    @apply rounded-2xl bg-white/85 border border-sage/15 shadow-soft backdrop-blur-sm;
+  }
+
+  .label {
+    @apply block text-xs font-semibold uppercase tracking-wider text-sage mb-1.5;
+  }
+
+  .chip {
+    @apply inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold;
+  }
+}
