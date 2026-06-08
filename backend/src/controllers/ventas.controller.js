@@ -2,21 +2,31 @@ import { getSQLite } from '../config/sqlite.js';
 import { validators } from '../middleware/validator.js';
 import { audit } from '../utils/audit.js';
 import { notificar, notificarAdmins } from '../utils/notificaciones.js';
+import logger from '../utils/logger.js';
 
 export async function proximoNumero(req, res) {
+  const correlationId = req.correlationId;
   try {
     const db = getSQLite();
     const r = await db.get('SELECT COALESCE(MAX(numero_nota), 0) AS m FROM notas_remision');
+    logger.info({ correlationId, proximoNumero: r.m + 1, action: 'proximo_numero' }, 'Próximo número de nota consultado');
     res.json({ proximoNumero: r.m + 1 });
   } catch (err) {
+    logger.error({ correlationId, err: err.message, action: 'proximo_numero_error' }, 'Error al obtener próximo número');
     res.status(500).json({ error: 'Error' });
   }
 }
 
 export async function listVentas(req, res) {
+  const correlationId = req.correlationId;
   try {
     const { clienteId, estadoPago, desde, hasta } = req.query;
     const db = getSQLite();
+
+    logger.info(
+      { correlationId, userId: req.user.id, filtros: { clienteId, estadoPago, desde, hasta }, action: 'list_ventas' },
+      'Listado de ventas consultado'
+    );
 
     let sql = `
       SELECT
@@ -51,16 +61,28 @@ export async function listVentas(req, res) {
       for (const n of notas) n.detalles = byId[n.id] || [];
     }
 
+    logger.info(
+      { correlationId, userId: req.user.id, total: notas.length, action: 'list_ventas_success' },
+      `Se encontraron ${notas.length} ventas`
+    );
+
     res.json({ notas });
   } catch (err) {
-    console.error('Error listVentas:', err);
+    logger.error({ correlationId, err: err.message, action: 'list_ventas_error' }, 'Error al listar ventas');
     res.status(500).json({ error: 'Error al listar ventas' });
   }
 }
 
 export async function getVenta(req, res) {
+  const correlationId = req.correlationId;
   try {
     const db = getSQLite();
+
+    logger.info(
+      { correlationId, userId: req.user.id, ventaId: req.params.id, action: 'get_venta' },
+      'Detalle de venta consultado'
+    );
+
     const nota = await db.get(
       `SELECT nr.*, c.nombre AS cliente_nombre, u.nombre AS usuario_nombre,
               COALESCE((SELECT SUM(monto_pagado) FROM pagos WHERE nota_id = nr.id),0) AS total_pagado,
@@ -71,33 +93,57 @@ export async function getVenta(req, res) {
        WHERE nr.id = ?`,
       [req.params.id]
     );
-    if (!nota) return res.status(404).json({ error: 'Venta no encontrada' });
+
+    if (!nota) {
+      logger.warn(
+        { correlationId, userId: req.user.id, ventaId: req.params.id, action: 'get_venta_not_found' },
+        'Venta no encontrada'
+      );
+      return res.status(404).json({ error: 'Venta no encontrada' });
+    }
 
     nota.detalles = await db.all('SELECT * FROM detalles_nota WHERE nota_id = ?', [nota.id]);
     nota.cliente  = await db.get('SELECT * FROM clientes WHERE id = ?', [nota.cliente_id]);
 
     res.json({ nota });
   } catch (err) {
+    logger.error({ correlationId, err: err.message, action: 'get_venta_error' }, 'Error al obtener venta');
     res.status(500).json({ error: 'Error al obtener venta' });
   }
 }
 
 export async function createVenta(req, res) {
+  const correlationId = req.correlationId;
   const db = getSQLite();
   try {
     const { clienteId, fechaVenta, estadoPago, metodoPago, descuentoPorcentaje, notas, detalles } = req.body;
 
+    logger.info(
+      {
+        correlationId,
+        userId: req.user.id,
+        clienteId,
+        fechaVenta,
+        estadoPago,
+        numLineas: detalles?.length,
+        action: 'create_venta_attempt',
+      },
+      'Intento de crear venta'
+    );
+
     if (!clienteId || !fechaVenta || !Array.isArray(detalles) || detalles.length === 0) {
+      logger.warn({ correlationId, userId: req.user.id, action: 'create_venta_invalid' }, 'Datos inválidos para crear venta');
       return res.status(400).json({ error: 'Faltan datos obligatorios' });
     }
     if (!validators.estadoPago(estadoPago)) {
+      logger.warn({ correlationId, estadoPago, action: 'create_venta_invalid_estado' }, 'Estado de pago inválido');
       return res.status(400).json({ error: 'estadoPago inválido' });
     }
     if (estadoPago === 'pagado' && !validators.metodoPago(metodoPago)) {
+      logger.warn({ correlationId, metodoPago, action: 'create_venta_invalid_metodo' }, 'Método de pago inválido');
       return res.status(400).json({ error: 'metodoPago inválido' });
     }
 
-    // Validar detalles
     let subtotal = 0;
     for (const d of detalles) {
       if (!d.tipo_hilo) return res.status(400).json({ error: 'tipo_hilo requerido' });
@@ -106,9 +152,11 @@ export async function createVenta(req, res) {
       subtotal += parseFloat(d.cantidad) * parseFloat(d.precio_unitario);
     }
 
-    // Descuento: el mayor entre el manual y el global del cliente
     const cliente = await db.get('SELECT descuento_global FROM clientes WHERE id = ?', [clienteId]);
-    if (!cliente) return res.status(404).json({ error: 'Cliente no encontrado' });
+    if (!cliente) {
+      logger.warn({ correlationId, clienteId, action: 'create_venta_cliente_not_found' }, 'Cliente no encontrado');
+      return res.status(404).json({ error: 'Cliente no encontrado' });
+    }
 
     const descManual = Math.max(0, Math.min(100, parseFloat(descuentoPorcentaje || 0)));
     const descGlobal = parseFloat(cliente.descuento_global || 0);
@@ -116,7 +164,6 @@ export async function createVenta(req, res) {
     const descuentoAplicado = subtotal * (descPct / 100);
     const montoFinal = subtotal - descuentoAplicado;
 
-    // Próximo número de nota
     const maxR = await db.get('SELECT COALESCE(MAX(numero_nota), 0) AS m FROM notas_remision');
     const numeroNota = maxR.m + 1;
 
@@ -150,7 +197,21 @@ export async function createVenta(req, res) {
 
     await db.exec('COMMIT');
 
-    // Notificar al vendedor
+    logger.info(
+      {
+        correlationId,
+        userId: req.user.id,
+        ventaId: nota.lastID,
+        numeroNota,
+        clienteId,
+        montoFinal,
+        estadoPago,
+        descuentoAplicado,
+        action: 'create_venta_success',
+      },
+      `Venta #${numeroNota} creada por $${montoFinal.toFixed(2)}`
+    );
+
     notificar({
       usuarioId: req.user.id,
       tipo: 'success',
@@ -160,8 +221,11 @@ export async function createVenta(req, res) {
       metadata: { notaId: nota.lastID, montoFinal },
     });
 
-    // Avisar a admins si la venta es grande
     if (montoFinal >= 5000) {
+      logger.warn(
+        { correlationId, userId: req.user.id, numeroNota, montoFinal, action: 'create_venta_large' },
+        'Venta de monto alto registrada'
+      );
       notificarAdmins({
         tipo: 'info',
         titulo: 'Venta importante',
@@ -179,19 +243,31 @@ export async function createVenta(req, res) {
     });
   } catch (err) {
     await db.exec('ROLLBACK').catch(() => {});
-    console.error('Error createVenta:', err);
+    logger.error(
+      { correlationId, userId: req.user.id, err: err.message, action: 'create_venta_error' },
+      'Error al crear venta'
+    );
     res.status(500).json({ error: 'Error al crear venta' });
   }
 }
 
 export async function updateVenta(req, res) {
+  const correlationId = req.correlationId;
   try {
     const { id } = req.params;
     const { estadoPago, metodoPago, notas } = req.body;
     const db = getSQLite();
 
+    logger.info(
+      { correlationId, userId: req.user.id, ventaId: id, estadoPago, action: 'update_venta' },
+      'Intento de actualizar venta'
+    );
+
     const nota = await db.get('SELECT * FROM notas_remision WHERE id = ?', [id]);
-    if (!nota) return res.status(404).json({ error: 'Venta no encontrada' });
+    if (!nota) {
+      logger.warn({ correlationId, ventaId: id, action: 'update_venta_not_found' }, 'Venta no encontrada');
+      return res.status(404).json({ error: 'Venta no encontrada' });
+    }
 
     if (estadoPago === 'pagado' && nota.estado_pago !== 'pagado') {
       const pagado = await db.get(
@@ -221,27 +297,54 @@ export async function updateVenta(req, res) {
       [estadoPago, metodoPago, notas, id]
     );
 
+    logger.info(
+      { correlationId, userId: req.user.id, ventaId: id, estadoPago, action: 'update_venta_success' },
+      'Venta actualizada correctamente'
+    );
+
     audit({ accion: 'actualizar', entidad: 'venta', entidadId: id, req, payload: req.body });
     res.json({ ok: true });
   } catch (err) {
-    console.error('Error updateVenta:', err);
+    logger.error({ correlationId, err: err.message, action: 'update_venta_error' }, 'Error al actualizar venta');
     res.status(500).json({ error: 'Error al actualizar venta' });
   }
 }
 
 export async function deleteVenta(req, res) {
+  const correlationId = req.correlationId;
   try {
     const { id } = req.params;
     const db = getSQLite();
+
+    logger.warn(
+      { correlationId, userId: req.user.id, ventaId: id, action: 'delete_venta_attempt' },
+      'Intento de eliminar venta'
+    );
+
     const nota = await db.get('SELECT * FROM notas_remision WHERE id = ?', [id]);
-    if (!nota) return res.status(404).json({ error: 'Venta no encontrada' });
+    if (!nota) {
+      logger.warn({ correlationId, ventaId: id, action: 'delete_venta_not_found' }, 'Venta no encontrada');
+      return res.status(404).json({ error: 'Venta no encontrada' });
+    }
     if (nota.estado_pago === 'pagado') {
+      logger.warn(
+        { correlationId, userId: req.user.id, ventaId: id, action: 'delete_venta_pagada' },
+        'Intento de eliminar venta pagada bloqueado'
+      );
       return res.status(400).json({ error: 'No se puede eliminar una venta pagada' });
     }
+
     await db.run('DELETE FROM notas_remision WHERE id = ?', [id]);
+
+    logger.warn(
+      { correlationId, userId: req.user.id, ventaId: id, numeroNota: nota.numero_nota, action: 'delete_venta_success' },
+      `Venta #${nota.numero_nota} eliminada`
+    );
+
     audit({ accion: 'eliminar', entidad: 'venta', entidadId: id, req });
     res.json({ ok: true });
   } catch (err) {
+    logger.error({ correlationId, err: err.message, action: 'delete_venta_error' }, 'Error al eliminar venta');
     res.status(500).json({ error: 'Error al eliminar venta' });
   }
 }

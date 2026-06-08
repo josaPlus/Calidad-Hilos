@@ -2,15 +2,18 @@ import { getSQLite } from '../config/sqlite.js';
 import Egreso from '../models/mongo/Egreso.js';
 import { isMongoConnected } from '../config/mongo.js';
 import DashboardSnapshot from '../models/mongo/DashboardSnapshot.js';
+import logger from '../utils/logger.js';
 
-// ============================================================
-// 1) DASHBOARD CLIENTES
-// ============================================================
 export async function dashboardClientes(req, res) {
+  const correlationId = req.correlationId;
   try {
     const db = getSQLite();
 
-    // KPIs principales
+    logger.info(
+      { correlationId, userId: req.user.id, action: 'dashboard_clientes' },
+      'Dashboard de clientes consultado'
+    );
+
     const totales = await db.get(`
       SELECT
         COUNT(*) AS total,
@@ -19,13 +22,11 @@ export async function dashboardClientes(req, res) {
       FROM clientes
     `);
 
-    // Nuevos en últimos 30 días
     const nuevos = await db.get(`
       SELECT COUNT(*) AS n FROM clientes
       WHERE fecha_registro >= date('now','-30 days')
     `);
 
-    // Recurrentes: clientes con > 1 venta
     const recurrentes = await db.get(`
       SELECT COUNT(*) AS n FROM (
         SELECT cliente_id FROM notas_remision
@@ -33,7 +34,6 @@ export async function dashboardClientes(req, res) {
       )
     `);
 
-    // Crecimiento mensual: clientes nuevos por mes (últimos 12 meses)
     const crecimiento = await db.all(`
       SELECT
         strftime('%Y-%m', fecha_registro) AS mes,
@@ -44,7 +44,6 @@ export async function dashboardClientes(req, res) {
       ORDER BY mes ASC
     `);
 
-    // Top 10 clientes por monto
     const topClientes = await db.all(`
       SELECT
         c.id, c.nombre,
@@ -57,7 +56,6 @@ export async function dashboardClientes(req, res) {
       LIMIT 10
     `);
 
-    // Construir kpis ANTES de usarlos
     const kpis = {
       totalClientes: totales.total || 0,
       activos: totales.activos || 0,
@@ -66,39 +64,54 @@ export async function dashboardClientes(req, res) {
       recurrentes: recurrentes.n || 0,
     };
 
+    logger.info(
+      {
+        correlationId,
+        userId: req.user.id,
+        kpis,
+        action: 'dashboard_clientes_success',
+      },
+      'Dashboard de clientes generado correctamente'
+    );
+
     if (isMongoConnected()) {
       DashboardSnapshot.create({
         tipo: 'clientes',
         rango: 'mes',
         data: { kpis, crecimientoMensual: crecimiento, topClientes },
         usuarioId: req.user.id,
-      }).catch(() => { });
+      }).catch((err) => {
+        logger.warn(
+          { correlationId, err: err.message, action: 'dashboard_snapshot_error' },
+          'No se pudo guardar snapshot de dashboard clientes'
+        );
+      });
     }
 
-    res.json({
-      kpis,
-      crecimientoMensual: crecimiento,
-      topClientes,
-    });
+    res.json({ kpis, crecimientoMensual: crecimiento, topClientes });
   } catch (err) {
-    console.error('Error dashboardClientes:', err);
+    logger.error(
+      { correlationId, err: err.message, action: 'dashboard_clientes_error' },
+      'Error en dashboard de clientes'
+    );
     res.status(500).json({ error: 'Error en dashboard de clientes' });
   }
 }
 
-// ============================================================
-// 2) DASHBOARD FINANZAS (ingresos + egresos)
-// ============================================================
 export async function dashboardFinanzas(req, res) {
+  const correlationId = req.correlationId;
   try {
     const db = getSQLite();
     const { desde, hasta } = req.query;
 
-    // Por defecto: últimos 90 días
     const fechaDesde = desde || new Date(Date.now() - 90 * 86400000).toISOString().slice(0, 10);
     const fechaHasta = hasta || new Date().toISOString().slice(0, 10);
 
-    // === INGRESOS (SQLite - notas_remision) ===
+    logger.info(
+      { correlationId, userId: req.user.id, fechaDesde, fechaHasta, action: 'dashboard_finanzas' },
+      'Dashboard financiero consultado'
+    );
+
     const ingresosResumen = await db.get(`
       SELECT
         COALESCE(SUM(monto_final), 0) AS total,
@@ -116,7 +129,6 @@ export async function dashboardFinanzas(req, res) {
       ORDER BY fecha_venta ASC
     `, [fechaDesde, fechaHasta]);
 
-    // === EGRESOS (MongoDB) ===
     let egresosResumen = { total: 0, num_egresos: 0 };
     let egresosPorDia = [];
     let topCategorias = [];
@@ -151,9 +163,13 @@ export async function dashboardFinanzas(req, res) {
         { $limit: 5 },
       ]);
       topCategorias = aggrCats.map(x => ({ categoria: x._id, total: x.total, n: x.n }));
+    } else {
+      logger.warn(
+        { correlationId, action: 'dashboard_finanzas_no_mongo' },
+        'MongoDB no disponible, egresos omitidos en dashboard financiero'
+      );
     }
 
-    // === FLUJO COMBINADO POR DÍA + DÍAS NEGATIVOS ===
     const mapDias = {};
     for (const i of ingresosPorDia) mapDias[i.fecha] = { fecha: i.fecha, ingresos: i.monto, egresos: 0 };
     for (const e of egresosPorDia) {
@@ -169,11 +185,31 @@ export async function dashboardFinanzas(req, res) {
       .sort((a, b) => a.neto - b.neto)
       .slice(0, 10);
 
-    // KPIs
     const flujoNeto = ingresosResumen.total - egresosResumen.total;
     const promedioPorCliente = ingresosResumen.clientes_unicos
       ? ingresosResumen.total / ingresosResumen.clientes_unicos
       : 0;
+
+    const kpis = {
+      totalIngresos: ingresosResumen.total,
+      totalEgresos: egresosResumen.total,
+      flujoNeto,
+      numVentas: ingresosResumen.num_ventas,
+      numEgresos: egresosResumen.num_egresos,
+      clientesUnicos: ingresosResumen.clientes_unicos,
+      promedioPorCliente,
+    };
+
+    logger.info(
+      {
+        correlationId,
+        userId: req.user.id,
+        kpis,
+        diasNegativos: diasNegativos.length,
+        action: 'dashboard_finanzas_success',
+      },
+      'Dashboard financiero generado correctamente'
+    );
 
     if (isMongoConnected()) {
       DashboardSnapshot.create({
@@ -181,39 +217,36 @@ export async function dashboardFinanzas(req, res) {
         rango: 'custom',
         desde: new Date(fechaDesde),
         hasta: new Date(fechaHasta),
-        data: { kpis: { totalIngresos: ingresosResumen.total, totalEgresos: egresosResumen.total, flujoNeto, promedioPorCliente }, topCategorias, diasNegativos },
+        data: { kpis, topCategorias, diasNegativos },
         usuarioId: req.user.id,
-      }).catch(() => { });
+      }).catch((err) => {
+        logger.warn(
+          { correlationId, err: err.message, action: 'dashboard_snapshot_error' },
+          'No se pudo guardar snapshot de dashboard finanzas'
+        );
+      });
     }
 
-    res.json({
-      periodo: { desde: fechaDesde, hasta: fechaHasta },
-      kpis: {
-        totalIngresos: ingresosResumen.total,
-        totalEgresos: egresosResumen.total,
-        flujoNeto,
-        numVentas: ingresosResumen.num_ventas,
-        numEgresos: egresosResumen.num_egresos,
-        clientesUnicos: ingresosResumen.clientes_unicos,
-        promedioPorCliente,
-      },
-      flujoDiario,
-      topCategorias,
-      diasNegativos,
-    });
+    res.json({ periodo: { desde: fechaDesde, hasta: fechaHasta }, kpis, flujoDiario, topCategorias, diasNegativos });
   } catch (err) {
-    console.error('Error dashboardFinanzas:', err);
+    logger.error(
+      { correlationId, err: err.message, action: 'dashboard_finanzas_error' },
+      'Error en dashboard financiero'
+    );
     res.status(500).json({ error: 'Error en dashboard financiero' });
   }
 }
 
-// ============================================================
-// 3) DASHBOARD HILOS (top productos)
-// ============================================================
 export async function dashboardHilos(req, res) {
+  const correlationId = req.correlationId;
   try {
     const db = getSQLite();
     const { desde, hasta } = req.query;
+
+    logger.info(
+      { correlationId, userId: req.user.id, desde, hasta, action: 'dashboard_hilos' },
+      'Dashboard de hilos consultado'
+    );
 
     const filtroFechas = (desde && hasta)
       ? `WHERE nr.fecha_venta BETWEEN '${desde}' AND '${hasta}'`
@@ -232,22 +265,31 @@ export async function dashboardHilos(req, res) {
       ORDER BY monto_total DESC
     `);
 
-    const totalMonto = topHilos.reduce((s, x) => s + (x.monto_total || 0), 0);
+    const totalMonto    = topHilos.reduce((s, x) => s + (x.monto_total || 0), 0);
     const totalCantidad = topHilos.reduce((s, x) => s + (x.cantidad_total || 0), 0);
 
     const conPct = topHilos.map(h => ({
       ...h,
-      porcentaje_monto: totalMonto ? +(h.monto_total / totalMonto * 100).toFixed(2) : 0,
+      porcentaje_monto:    totalMonto    ? +(h.monto_total    / totalMonto    * 100).toFixed(2) : 0,
       porcentaje_cantidad: totalCantidad ? +(h.cantidad_total / totalCantidad * 100).toFixed(2) : 0,
     }));
 
-    // Construir kpis ANTES de usarlos
     const kpis = {
-      totalProductos: topHilos.length,
-      totalMontoVendido: totalMonto,
-      totalCantidadVendida: totalCantidad,
-      topProducto: conPct[0]?.tipo_hilo || 'N/A',
+      totalProductos:        topHilos.length,
+      totalMontoVendido:     totalMonto,
+      totalCantidadVendida:  totalCantidad,
+      topProducto:           conPct[0]?.tipo_hilo || 'N/A',
     };
+
+    logger.info(
+      {
+        correlationId,
+        userId: req.user.id,
+        kpis,
+        action: 'dashboard_hilos_success',
+      },
+      'Dashboard de hilos generado correctamente'
+    );
 
     if (isMongoConnected()) {
       DashboardSnapshot.create({
@@ -257,15 +299,20 @@ export async function dashboardHilos(req, res) {
         hasta: hasta ? new Date(hasta) : undefined,
         data: { kpis, topHilos: conPct },
         usuarioId: req.user.id,
-      }).catch(() => { });
+      }).catch((err) => {
+        logger.warn(
+          { correlationId, err: err.message, action: 'dashboard_snapshot_error' },
+          'No se pudo guardar snapshot de dashboard hilos'
+        );
+      });
     }
 
-    res.json({
-      kpis,
-      topHilos: conPct,
-    });
+    res.json({ kpis, topHilos: conPct });
   } catch (err) {
-    console.error('Error dashboardHilos:', err);
+    logger.error(
+      { correlationId, err: err.message, action: 'dashboard_hilos_error' },
+      'Error en dashboard de hilos'
+    );
     res.status(500).json({ error: 'Error en dashboard de hilos' });
   }
 }
