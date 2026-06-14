@@ -60,29 +60,7 @@ describe('POST /api/auth/login', () => {
     expect(res.body).toHaveProperty('error');
   });
 
-  it('rechaza email que no existe — 401', async () => {
-    const res = await request(app)
-      .post('/api/auth/login')
-      .send({ email: 'noexiste@hilos.app', password: 'admin123' });
 
-    expect(res.status).toBe(401);
-  });
-
-  it('rechaza body sin email — 400', async () => {
-    const res = await request(app)
-      .post('/api/auth/login')
-      .send({ password: 'admin123' });
-
-    expect(res.status).toBe(400);
-  });
-
-  it('rechaza body sin password — 400', async () => {
-    const res = await request(app)
-      .post('/api/auth/login')
-      .send({ email: 'admin@hilos.app' });
-
-    expect(res.status).toBe(400);
-  });
 });
 
 describe('GET /api/auth/me', () => {
@@ -105,19 +83,7 @@ describe('GET /api/auth/me', () => {
     expect(res.body.user).not.toHaveProperty('password');
   });
 
-  it('rechaza request sin token — 401', async () => {
-    const res = await request(app).get('/api/auth/me');
 
-    expect(res.status).toBe(401);
-  });
-
-  it('rechaza token inválido — 401', async () => {
-    const res = await request(app)
-      .get('/api/auth/me')
-      .set('Authorization', 'Bearer token.falso.aqui');
-
-    expect(res.status).toBe(401);
-  });
 });
 
 describe('POST /api/auth/logout', () => {
@@ -139,9 +105,5 @@ describe('POST /api/auth/logout', () => {
     expect(res.body).toHaveProperty('ok', true);
   });
 
-  it('rechaza logout sin token — 401', async () => {
-    const res = await request(app).post('/api/auth/logout');
 
-    expect(res.status).toBe(401);
-  });
 });

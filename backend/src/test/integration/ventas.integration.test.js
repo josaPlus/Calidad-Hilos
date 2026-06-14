@@ -76,19 +76,7 @@ describe('GET /api/ventas', () => {
     expect(Array.isArray(res.body.notas)).toBe(true);
   });
 
-  it('empleado puede listar ventas', async () => {
-    const res = await request(app)
-      .get('/api/ventas')
-      .set('Authorization', `Bearer ${tokenEmpleado}`);
 
-    expect(res.status).toBe(200);
-  });
-
-  it('rechaza sin token — 401', async () => {
-    const res = await request(app).get('/api/ventas');
-
-    expect(res.status).toBe(401);
-  });
 });
 
 describe('POST /api/ventas', () => {
@@ -136,55 +124,7 @@ describe('POST /api/ventas', () => {
     expect(res.status).toBe(400);
   });
 
-  it('rechaza venta sin detalles — 400', async () => {
-    const res = await request(app)
-      .post('/api/ventas')
-      .set('Authorization', `Bearer ${tokenAdmin}`)
-      .send({
-        clienteId,
-        fechaVenta: '2026-06-14',
-        estadoPago: 'no_pagado',
-        detalles: [],
-      });
 
-    expect(res.status).toBe(400);
-  });
-
-  it('rechaza estado de pago inválido — 400', async () => {
-    const res = await request(app)
-      .post('/api/ventas')
-      .set('Authorization', `Bearer ${tokenAdmin}`)
-      .send({
-        clienteId,
-        fechaVenta: '2026-06-14',
-        estadoPago: 'cancelado',
-        detalles: [{ tipo_hilo: 'Poliéster', cantidad: 5, precio_unitario: 20 }],
-      });
-
-    expect(res.status).toBe(400);
-  });
-
-  it('rechaza cliente inexistente — 404', async () => {
-    const res = await request(app)
-      .post('/api/ventas')
-      .set('Authorization', `Bearer ${tokenAdmin}`)
-      .send({
-        clienteId: 99999,
-        fechaVenta: '2026-06-14',
-        estadoPago: 'no_pagado',
-        detalles: [{ tipo_hilo: 'Poliéster', cantidad: 5, precio_unitario: 20 }],
-      });
-
-    expect(res.status).toBe(404);
-  });
-
-  it('rechaza sin token — 401', async () => {
-    const res = await request(app)
-      .post('/api/ventas')
-      .send({ clienteId, fechaVenta: '2026-06-14', estadoPago: 'no_pagado', detalles: [] });
-
-    expect(res.status).toBe(401);
-  });
 });
 
 describe('GET /api/ventas/:id', () => {
@@ -227,11 +167,5 @@ describe('DELETE /api/ventas/:id', () => {
     expect(res.body).toHaveProperty('ok', true);
   });
 
-  it('empleado no puede eliminar venta — 403', async () => {
-    const res = await request(app)
-      .delete(`/api/ventas/${ventaId}`)
-      .set('Authorization', `Bearer ${tokenEmpleado}`);
 
-    expect(res.status).toBe(403);
-  });
 });

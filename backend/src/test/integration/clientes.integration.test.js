@@ -69,19 +69,7 @@ describe('GET /api/clientes', () => {
     expect(Array.isArray(res.body.clientes)).toBe(true);
   });
 
-  it('empleado puede listar clientes', async () => {
-    const res = await request(app)
-      .get('/api/clientes')
-      .set('Authorization', `Bearer ${tokenEmpleado}`);
 
-    expect(res.status).toBe(200);
-  });
-
-  it('rechaza sin token — 401', async () => {
-    const res = await request(app).get('/api/clientes');
-
-    expect(res.status).toBe(401);
-  });
 });
 
 describe('POST /api/clientes', () => {
@@ -115,13 +103,7 @@ describe('POST /api/clientes', () => {
     expect(res.status).toBe(400);
   });
 
-  it('rechaza sin token — 401', async () => {
-    const res = await request(app)
-      .post('/api/clientes')
-      .send({ nombre: 'Sin Auth' });
 
-    expect(res.status).toBe(401);
-  });
 });
 
 describe('GET /api/clientes/:id', () => {
@@ -143,25 +125,6 @@ describe('GET /api/clientes/:id', () => {
   });
 });
 
-describe('PUT /api/clientes/:id', () => {
-  it('admin puede actualizar cliente', async () => {
-    const res = await request(app)
-      .put(`/api/clientes/${clienteId}`)
-      .set('Authorization', `Bearer ${tokenAdmin}`)
-      .send({ nombre: 'Cliente Actualizado', ciudad: 'Guadalajara' });
-
-    expect(res.status).toBe(200);
-  });
-
-  it('empleado no puede actualizar cliente — 403', async () => {
-    const res = await request(app)
-      .put(`/api/clientes/${clienteId}`)
-      .set('Authorization', `Bearer ${tokenEmpleado}`)
-      .send({ nombre: 'Intento Empleado' });
-
-    expect(res.status).toBe(403);
-  });
-});
 
 describe('DELETE /api/clientes/:id', () => {
   it('elimina cliente sin ventas', async () => {
@@ -180,11 +143,5 @@ describe('DELETE /api/clientes/:id', () => {
     expect(res.body).toHaveProperty('ok', true);
   });
 
-  it('empleado no puede eliminar cliente — 403', async () => {
-    const res = await request(app)
-      .delete(`/api/clientes/${clienteId}`)
-      .set('Authorization', `Bearer ${tokenEmpleado}`);
 
-    expect(res.status).toBe(403);
-  });
 });

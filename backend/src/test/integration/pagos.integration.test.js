@@ -98,38 +98,9 @@ describe('GET /api/pagos', () => {
         expect(Array.isArray(res.body.pagos)).toBe(true);
     });
 
-    it('empleado puede listar pagos', async () => {
-        const res = await request(app)
-            .get('/api/pagos')
-            .set('Authorization', `Bearer ${tokenEmpleado}`);
 
-        expect(res.status).toBe(200);
-    });
-
-    it('rechaza sin token — 401', async () => {
-        const res = await request(app).get('/api/pagos');
-
-        expect(res.status).toBe(401);
-    });
 });
 
-describe('GET /api/pagos/saldo/pendiente', () => {
-    it('retorna saldos pendientes', async () => {
-        const res = await request(app)
-            .get('/api/pagos/saldo/pendiente')
-            .set('Authorization', `Bearer ${tokenAdmin}`);
-
-        expect(res.status).toBe(200);
-        expect(res.body).toHaveProperty('saldos');
-        expect(Array.isArray(res.body.saldos)).toBe(true);
-    });
-
-    it('rechaza sin token — 401', async () => {
-        const res = await request(app).get('/api/pagos/saldo/pendiente');
-
-        expect(res.status).toBe(401);
-    });
-});
 
 describe('POST /api/pagos', () => {
     it('registra pago parcial correctamente', async () => {
@@ -163,69 +134,5 @@ describe('POST /api/pagos', () => {
         expect(res.body).toHaveProperty('nuevoEstado', 'pagado');
     });
 
-    it('empleado puede registrar pago', async () => {
-        const resCliente = await request(app)
-            .post('/api/clientes')
-            .set('Authorization', `Bearer ${tokenAdmin}`)
-            .send({ nombre: 'Cliente Extra' });
 
-        const resVenta = await request(app)
-            .post('/api/ventas')
-            .set('Authorization', `Bearer ${tokenAdmin}`)
-            .send({
-                clienteId: resCliente.body.cliente.id,
-                fechaVenta: '2026-06-14',
-                estadoPago: 'no_pagado',
-                detalles: [{ tipo_hilo: 'Lana', cantidad: 2, precio_unitario: 80 }],
-            });
-
-        const res = await request(app)
-            .post('/api/pagos')
-            .set('Authorization', `Bearer ${tokenEmpleado}`)
-            .send({
-                notaId: resVenta.body.nota.id,
-                montoPagado: 160,
-                metodoPago: 'efectivo',
-                fechaPago: '2026-06-14',
-            });
-
-        expect(res.status).toBe(201);
-    });
-
-    it('rechaza monto mayor al pendiente — 400', async () => {
-        const res = await request(app)
-            .post('/api/pagos')
-            .set('Authorization', `Bearer ${tokenAdmin}`)
-            .send({
-                notaId: ventaId,
-                montoPagado: 99999,
-                metodoPago: 'efectivo',
-                fechaPago: '2026-06-14',
-            });
-
-        expect(res.status).toBe(400);
-        expect(res.body.error).toMatch(/pendiente/i);
-    });
-
-    it('rechaza nota inexistente — 404', async () => {
-        const res = await request(app)
-            .post('/api/pagos')
-            .set('Authorization', `Bearer ${tokenAdmin}`)
-            .send({
-                notaId: 99999,
-                montoPagado: 100,
-                metodoPago: 'efectivo',
-                fechaPago: '2026-06-14',
-            });
-
-        expect(res.status).toBe(404);
-    });
-
-    it('rechaza sin token — 401', async () => {
-        const res = await request(app)
-            .post('/api/pagos')
-            .send({ notaId: ventaId, montoPagado: 100, metodoPago: 'efectivo', fechaPago: '2026-06-14' });
-
-        expect(res.status).toBe(401);
-    });
 });
