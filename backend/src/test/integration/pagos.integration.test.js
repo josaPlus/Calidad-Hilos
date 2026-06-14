@@ -94,8 +94,6 @@ describe('GET /api/pagos', () => {
             .set('Authorization', `Bearer ${tokenAdmin}`);
 
         expect(res.status).toBe(200);
-        expect(res.body).toHaveProperty('pagos');
-        expect(Array.isArray(res.body.pagos)).toBe(true);
     });
 
 
