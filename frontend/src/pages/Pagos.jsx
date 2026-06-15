@@ -137,7 +137,7 @@ export default function Pagos() {
                       </td>
                       <td className="px-5 py-3 text-right text-stone-600">{s.ultima_compra ? fmtDate(s.ultima_compra) : '-'}</td>
                       <td className="px-5 py-3 text-center">
-                        <Button size="sm" variant="accent" onClick={() => abrirModal(s)}>Registrar pago</Button>
+                        <Button size="sm" variant="accent" data-testid="btn-registrar-pago" onClick={() => abrirModal(s)}>Registrar pago</Button>
                       </td>
                     </tr>
                   );
@@ -195,11 +195,11 @@ export default function Pagos() {
                 <option key={v.id} value={v.id}>Nota #{v.numero_nota} · {money(v.monto_pendiente)}</option>
               ))}
             </Select>
-            <Input label="Monto" type="number" step="0.01" value={form.montoPagado}
+            <Input label="Monto" data-testid="input-monto" type="number" step="0.01" value={form.montoPagado}
                    onChange={(e) => setForm({ ...form, montoPagado: parseFloat(e.target.value) || 0 })} />
-            <Input label="Fecha" type="date" value={form.fechaPago}
+            <Input label="Fecha" data-testid="input-fecha-pago" type="date" value={form.fechaPago}
                    onChange={(e) => setForm({ ...form, fechaPago: e.target.value })} />
-            <Select label="Método" value={form.metodoPago} onChange={(e) => setForm({ ...form, metodoPago: e.target.value })}>
+            <Select label="Método" data-testid="select-metodo" value={form.metodoPago} onChange={(e) => setForm({ ...form, metodoPago: e.target.value })}>
               <option value="efectivo">Efectivo</option>
               <option value="transferencia">Transferencia</option>
               <option value="deposito">Depósito</option>
@@ -210,7 +210,7 @@ export default function Pagos() {
             <Input label="Referencia (opcional)" value={form.referencia}
                    onChange={(e) => setForm({ ...form, referencia: e.target.value })} />
             <div className="flex gap-2 pt-2">
-              <Button type="submit"><DollarSign size={16}/> Registrar pago</Button>
+              <Button type="submit" data-testid="btn-guardar-pago"><DollarSign size={16}/> Registrar pago</Button>
               <Button type="button" variant="ghost" onClick={() => setModal(null)}>Cancelar</Button>
             </div>
           </form>

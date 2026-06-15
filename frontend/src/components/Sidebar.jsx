@@ -105,6 +105,7 @@ function Sidebar({ open, onClose }) {
         {/* === Logout === */}
         <div className="p-3 border-t border-sage/10">
           <button
+            data-testid="btn-logout"
             onClick={handleLogout}
             className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-stone-600 hover:bg-red-50 hover:text-red-700 transition text-sm font-medium"
           >

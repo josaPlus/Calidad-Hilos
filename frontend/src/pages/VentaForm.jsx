@@ -110,13 +110,13 @@ export default function VentaForm() {
       <form onSubmit={onSubmit} className="space-y-6">
         <Card title="Datos de la venta">
           <div className="grid sm:grid-cols-3 gap-4">
-            <Select label="Cliente *" value={clienteId} onChange={(e) => setClienteId(e.target.value)} required>
+            <Select label="Cliente *" data-testid="select-cliente" value={clienteId} onChange={(e) => setClienteId(e.target.value)} required>
               <option value="">— Selecciona —</option>
               {clientes.filter(c => c.estado_cliente === 'activo').map(c => (
                 <option key={c.id} value={c.id}>{c.nombre}</option>
               ))}
             </Select>
-            <Input label="Fecha" type="date" value={fecha} onChange={(e) => setFecha(e.target.value)} />
+            <Input label="Fecha" data-testid="input-fecha" type="date" value={fecha} onChange={(e) => setFecha(e.target.value)} />
             <Input
               label="Descuento manual %"
               type="number" min="0" max="100" step="0.5"
@@ -128,7 +128,7 @@ export default function VentaForm() {
         </Card>
 
         <Card title={`Líneas de productos (${lineas.length})`} action={
-          <Button type="button" variant="accent" size="sm" onClick={agregarLinea}><Plus size={14}/> Agregar</Button>
+          <Button type="button" variant="accent" size="sm" data-testid="btn-agregar-linea" onClick={agregarLinea}><Plus size={14}/> Agregar</Button>
         }>
           {lineas.length === 0 ? (
             <EmptyState title="Sin líneas" message="Agrega productos para esta venta" />
@@ -138,6 +138,7 @@ export default function VentaForm() {
                 <div key={l.id} ref={i === lineas.length - 1 ? lastRowRef : null} className="grid grid-cols-12 gap-2 items-end">
                   <Select
                     label={i === 0 ? 'Tipo de hilo' : ''}
+                    data-testid="input-tipo-hilo"
                     value={l.tipo_hilo}
                     onChange={(e) => {
                       const prod = productos.find(p => p.nombre === e.target.value);
@@ -152,6 +153,7 @@ export default function VentaForm() {
                   </Select>
                   <Input
                     label={i === 0 ? 'Cantidad' : ''}
+                    data-testid="input-cantidad"
                     type="number" min="0.01" step="0.01"
                     value={l.cantidad}
                     onChange={(e) => actualizarLinea(i, { cantidad: parseFloat(e.target.value) || 0 })}
@@ -159,6 +161,7 @@ export default function VentaForm() {
                   />
                   <Input
                     label={i === 0 ? 'Precio unit' : ''}
+                    data-testid="input-precio"
                     type="number" min="0" step="0.01"
                     value={l.precio_unitario}
                     onChange={(e) => actualizarLinea(i, { precio_unitario: parseFloat(e.target.value) || 0 })}
@@ -217,7 +220,7 @@ export default function VentaForm() {
         </Card>
 
         <div className="flex gap-2">
-          <Button type="submit" loading={saving} size="lg"><Save size={18}/> Guardar venta</Button>
+          <Button type="submit" loading={saving} size="lg" data-testid="btn-guardar-venta"><Save size={18}/> Guardar venta</Button>
           <Button type="button" variant="ghost" onClick={() => nav('/ventas')} size="lg">Cancelar</Button>
         </div>
       </form>

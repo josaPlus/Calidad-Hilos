@@ -1,0 +1,13 @@
+{
+  "linea1": {
+    "tipoHilo": "Poliéster",
+    "cantidad": "10",
+    "precio": "50"
+  },
+  "linea2": {
+    "tipoHilo": "Algodón",
+    "cantidad": "5",
+    "precio": "80"
+  },
+  "fecha": "2026-06-14"
+}

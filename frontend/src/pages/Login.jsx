@@ -81,6 +81,7 @@ export default function Login() {
           <div className="card p-8">
             <div className="flex gap-2 mb-6 bg-mist p-1 rounded-xl">
               <button
+                data-testid="btn-modo-login"
                 onClick={() => setMode('login')}
                 className={`flex-1 py-2 rounded-lg text-sm font-semibold transition
                   ${mode === 'login' ? 'bg-white text-sage shadow-sm' : 'text-stone-500'}`}
@@ -88,6 +89,7 @@ export default function Login() {
                 Iniciar sesión
               </button>
               <button
+                data-testid="btn-modo-registro"
                 onClick={() => setMode('register')}
                 className={`flex-1 py-2 rounded-lg text-sm font-semibold transition
                   ${mode === 'register' ? 'bg-white text-sage shadow-sm' : 'text-stone-500'}`}
@@ -110,6 +112,7 @@ export default function Login() {
                 <div className="relative">
                   <UserIcon size={16} className="absolute left-3 top-9 text-sage" />
                   <Input
+                    data-testid="input-nombre"
                     label="Nombre"
                     placeholder="Tu nombre completo"
                     value={form.nombre}
@@ -123,6 +126,7 @@ export default function Login() {
               <div className="relative">
                 <Mail size={16} className="absolute left-3 top-9 text-sage" />
                 <Input
+                  data-testid="input-email"
                   label="Correo"
                   type="email"
                   placeholder="tu@email.com"
@@ -136,6 +140,7 @@ export default function Login() {
               <div className="relative">
                 <Lock size={16} className="absolute left-3 top-9 text-sage" />
                 <Input
+                  data-testid="input-password"
                   label="Contraseña"
                   type="password"
                   placeholder="Mínimo 6 caracteres"
@@ -147,7 +152,7 @@ export default function Login() {
                 />
               </div>
 
-              <Button type="submit" loading={submitting} className="w-full" size="lg">
+              <Button type="submit" data-testid="btn-login" loading={submitting} className="w-full" size="lg">
                 {mode === 'login' ? 'Entrar' : 'Crear cuenta'}
               </Button>
             </form>

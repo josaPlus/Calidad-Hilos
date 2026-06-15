@@ -142,6 +142,7 @@ export default function ClientesList() {
                           <Edit2 size={15} />
                         </button>
                         <button
+                          data-testid="btn-eliminar-cliente"
                           onClick={() => setConfirm(c)}
                           className="p-2 text-red-500 hover:bg-red-50 rounded-lg"
                           title="Eliminar"

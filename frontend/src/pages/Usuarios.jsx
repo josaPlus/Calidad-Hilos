@@ -62,7 +62,7 @@ export default function Usuarios() {
           <h1 className="font-display text-3xl sm:text-4xl font-extrabold text-stone-800">Usuarios</h1>
           <p className="text-stone-500 mt-1">Administra accesos al sistema</p>
         </div>
-        <Button variant="accent" onClick={() => abrir()}><Plus size={16}/> Nuevo</Button>
+        <Button variant="accent" data-testid="btn-nuevo-usuario" onClick={() => abrir()}><Plus size={16}/> Nuevo</Button>
       </div>
 
       <Card padding={false}>
@@ -107,17 +107,18 @@ export default function Usuarios() {
 
       <Modal open={!!modal} onClose={() => setModal(null)} title={modal === 'new' ? 'Nuevo usuario' : 'Editar usuario'}>
         <form onSubmit={guardar} className="space-y-4">
-          <Input label="Nombre *" value={form.nombre} onChange={(e) => setForm({ ...form, nombre: e.target.value })} required />
+          <Input data-testid="input-nombre" label="Nombre *" value={form.nombre} onChange={(e) => setForm({ ...form, nombre: e.target.value })} required />
           {modal === 'new' && (
-            <Input label="Email *" type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} required />
+            <Input data-testid="input-email" label="Email *" type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} required />
           )}
           <Input
+            data-testid="input-password"
             label={modal === 'new' ? 'Contraseña *' : 'Nueva contraseña (opcional)'}
             type="password" value={form.password}
             onChange={(e) => setForm({ ...form, password: e.target.value })}
             required={modal === 'new'} minLength={6}
           />
-          <Select label="Rol" value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value })}>
+          <Select data-testid="select-rol" label="Rol" value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value })}>
             <option value="empleado">Empleado (solo ventas y egresos)</option>
             <option value="admin">Administrador (acceso total)</option>
           </Select>
@@ -128,7 +129,7 @@ export default function Usuarios() {
             </Select>
           )}
           <div className="flex gap-2 pt-2">
-            <Button type="submit">Guardar</Button>
+            <Button type="submit" data-testid="btn-guardar-usuario">Guardar</Button>
             <Button type="button" variant="ghost" onClick={() => setModal(null)}>Cancelar</Button>
           </div>
         </form>

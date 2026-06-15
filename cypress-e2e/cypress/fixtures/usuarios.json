@@ -1,0 +1,10 @@
+{
+  "admin": {
+    "email": "admin@hilos.app",
+    "password": "admin123"
+  },
+  "empleado": {
+    "email": "empleado@hilos.app",
+    "password": "emp123"
+  }
+}
