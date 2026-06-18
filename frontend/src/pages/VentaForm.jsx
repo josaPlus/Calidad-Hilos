@@ -70,6 +70,12 @@ export default function VentaForm() {
     if (lineas.some(l => !l.tipo_hilo || !l.cantidad || !l.precio_unitario)) {
       return toast.error('Completa todas las líneas');
     }
+    if (lineas.some(l => parseFloat(l.precio_unitario) <= 0)) {
+      return toast.error('El precio unitario debe ser mayor a 0');
+    }
+    if (fecha > new Date().toISOString().slice(0, 10)) {
+      return toast.error('La fecha no puede ser futura');
+    }
 
     setSaving(true);
     try {
@@ -116,7 +122,7 @@ export default function VentaForm() {
                 <option key={c.id} value={c.id}>{c.nombre}</option>
               ))}
             </Select>
-            <Input label="Fecha" data-testid="input-fecha" type="date" value={fecha} onChange={(e) => setFecha(e.target.value)} />
+            <Input label="Fecha" data-testid="input-fecha" type="date" value={fecha} max={new Date().toISOString().slice(0, 10)} onChange={(e) => setFecha(e.target.value)} />
             <Input
               label="Descuento manual %"
               type="number" min="0" max="100" step="0.5"
@@ -160,9 +166,9 @@ export default function VentaForm() {
                     className="col-span-2"
                   />
                   <Input
-                    label={i === 0 ? 'Precio unit' : ''}
+                    label={i === 0 ? 'Precio unitario' : ''}
                     data-testid="input-precio"
-                    type="number" min="0" step="0.01"
+                    type="number" min="0.01" step="0.01"
                     value={l.precio_unitario}
                     onChange={(e) => actualizarLinea(i, { precio_unitario: parseFloat(e.target.value) || 0 })}
                     className="col-span-2"
