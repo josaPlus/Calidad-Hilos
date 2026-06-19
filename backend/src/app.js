@@ -6,6 +6,7 @@ import pinoHttp from 'pino-http';
 import { isMongoConnected } from './config/mongo.js';
 import apiRoutes from './routes/index.js';
 import logger, { generateCorrelationId } from './utils/logger.js';
+import { metricsMiddleware, metricsHandler } from './utils/metrics.js';
 
 const app = express();
 
@@ -14,6 +15,8 @@ app.use((req, res, next) => {
   res.setHeader('x-correlation-id', req.correlationId);
   next();
 });
+
+app.use(metricsMiddleware);
 
 app.use(
   pinoHttp({
@@ -42,6 +45,8 @@ app.use(bodyParser.urlencoded({ extended: true }));
 app.get('/api/status', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString(), sqlite: true, mongo: isMongoConnected() });
 });
+
+app.get('/api/metrics', metricsHandler);
 
 app.use('/api', apiRoutes);
 
