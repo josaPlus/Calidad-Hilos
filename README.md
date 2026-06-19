@@ -4,6 +4,18 @@ Aplicación full-stack para la gestión de un negocio de venta de hilos: cliente
 
 > **Resultado de unir dos repositorios:** el gestor de ventas de hilos (React + Express + SQLite) y DronoxAdmin (roles, dashboards, egresos con MongoDB), reescrito como **una sola aplicación coherente**.
 
+Proyecto desarrollado como entregable final de la materia de **Calidad de Software**.
+
+---
+
+## 👥 Equipo
+
+| Integrante | Rol en el proyecto |
+|---|---|
+| **Josafat Aguirre** | Backend dev + QA — unit tests, integration tests, logging |
+| **Ruth Manriquez** | Testing E2E (Cypress) y de rendimiento (JMeter) |
+| **Camila Liedo** | Testing de seguridad (OWASP ZAP) y accesibilidad (WCAG 2.1 + compatibilidad de navegadores) |
+
 ---
 
 ## ✨ Funcionalidades
@@ -33,6 +45,8 @@ Aplicación full-stack para la gestión de un negocio de venta de hilos: cliente
 | React + JavaScript | ✅ | Vite + React 18 |
 | Hooks de calidad (`useState`, `useEffect`, `useMemo`, `useCallback`, `useRef`, `memo`, custom hooks, Context API) | ✅ | Detalle abajo |
 | Redux Toolkit (cuando aporta) | ✅ | 5 slices |
+| Logging estructurado con correlationId | ✅ | Pino — ver sección de Logging |
+| Suite de pruebas (unitarias, integración, E2E, rendimiento, seguridad) | ✅ | Ver sección de Testing |
 
 ---
 
@@ -53,7 +67,8 @@ Aplicación full-stack para la gestión de un negocio de venta de hilos: cliente
                               │  HTTP /api (axios + JWT)
 ┌─────────────────────────────▼───────────────────────────────┐
 │                  BACKEND (Express + JWT)                    │
-│   Middleware: auth, soloAdmin, adminOEmpleado, validator    │
+│   Middleware: auth, soloAdmin, adminOEmpleado, validator,   │
+│               correlationId, pinoHttp (logging)             │
 │                                                             │
 │   ┌─────────────────────┐      ┌─────────────────────────┐  │
 │   │   SQLite (8 tablas) │      │  MongoDB (4 colecc.)    │  │
@@ -126,7 +141,7 @@ Tipografía: **Fraunces** (display) + **Plus Jakarta Sans** (cuerpo) — vía Go
 git clone <repo>
 cd hilos-app
 npm run install:all
-# (instala dependencias en raíz, backend y frontend)
+# (instala dependencias en raíz, backend, frontend y cypress)
 ```
 
 ### 2. Configurar backend
@@ -405,7 +420,8 @@ GET    /api/dashboard/clientes   [admin]
 GET    /api/dashboard/finanzas   [admin]
 GET    /api/dashboard/hilos      [admin]
 
-GET    /api/status               (público)
+GET    /api/metrics              (público) ← RED metrics por endpoint
+GET    /api/status                (público)
 ```
 
 ---
@@ -416,7 +432,8 @@ GET    /api/status               (público)
 hilos-app/
 ├── backend/
 │   ├── src/
-│   │   ├── server.js               # Entry point Express
+│   │   ├── app.js                  # App de Express (sin listen) — usada por Supertest
+│   │   ├── server.js               # Entry point — importa app.js y levanta el listen
 │   │   ├── config/
 │   │   │   ├── sqlite.js           # SQLite + schema + seed
 │   │   │   └── mongo.js            # MongoDB (tolerante a fallos)
@@ -430,7 +447,26 @@ hilos-app/
 │   │   │   └── DashboardSnapshot.js
 │   │   ├── controllers/            # auth, users, clientes, ventas, pagos, egresos, productos, dashboard
 │   │   ├── routes/index.js         # Todas las rutas
-│   │   └── utils/audit.js          # Log a MongoDB
+│   │   └── utils/
+│   │       ├── audit.js            # Log a MongoDB
+│   │       ├── logger.js           # Pino — logging estructurado
+│   │       └── metrics.js          # RED metrics por endpoint (rate, errors, duration)
+│   ├── tests/
+│   │   ├── unit/                   # Vitest — 11 archivos, 218 tests
+│   │   │   ├── validator.test.js
+│   │   │   ├── calculos.test.js
+│   │   │   ├── auth.controller.test.js
+│   │   │   ├── users.controller.test.js
+│   │   │   ├── productos.controller.test.js
+│   │   │   ├── pagos.controller.test.js
+│   │   │   ├── clientes.controller.test.js
+│   │   │   ├── ventas.controller.test.js
+│   │   │   └── egresos.controller.test.js
+│   │   └── integration/            # Supertest contra SQLite real
+│   │       ├── auth.test.js
+│   │       ├── clientes.test.js
+│   │       ├── ventas.test.js
+│   │       └── pagos.test.js
 │   ├── .env.example
 │   └── package.json
 ├── frontend/
@@ -450,11 +486,94 @@ hilos-app/
 │   ├── vite.config.js
 │   ├── tailwind.config.js
 │   └── package.json
+├── cypress/
+│   ├── e2e/                        # 8 flujos requeridos
+│   ├── fixtures/
+│   ├── support/
+│   │   └── commands.js             # Custom commands (cy.login, etc.)
+│   ├── pages/                      # Page Object Model
+│   └── package.json
 ├── docs/
 │   ├── DATABASE_SQL.md
 │   └── DATABASE_NOSQL.md
 └── README.md
 ```
+
+> **Nota:** los archivos de JMeter (`.jmx`) y el reporte de OWASP ZAP no están incluidos en este listado por simplicidad, pero forman parte de los entregables del proyecto (ver sección de Testing).
+
+---
+
+## 🧪 Testing
+
+El proyecto cuenta con una suite de pruebas en 5 niveles, distribuida entre los tres integrantes del equipo.
+
+### Unit tests — Vitest
+
+- **11 archivos · 218 tests** pasando.
+- Cobertura: validadores, lógica de negocio pura (cálculos de descuentos, subtotales, estado de pago, porcentajes) y controladores (`auth`, `users`, `productos`, `pagos`, `clientes`, `ventas`, `egresos`).
+- Uso de `vi.mock` para aislar MongoDB y dependencias externas en cada test.
+- Patrón Arrange-Act-Assert, tests independientes entre sí.
+
+```bash
+cd backend
+npm run test:unit
+```
+
+### Integration tests — Supertest
+
+- **4 archivos**: `auth`, `clientes`, `ventas`, `pagos`.
+- Corren contra una base SQLite de pruebas real (no mockeada), con limpieza vía `unlinkSync` al finalizar cada suite.
+- Requirió separar `app.js` (la app de Express) de `server.js` (el `listen()`), para que Supertest pueda importar la app sin levantar un puerto real.
+
+```bash
+cd backend
+npm run test:integration
+```
+
+### E2E — Cypress
+
+- Proyecto completo con **Page Object Model**, fixtures, custom commands y `cypress-axe` para accesibilidad básica.
+- Cubre los **8 flujos requeridos** por el examen (login, CRUD de clientes, registro de venta, registro de pago, registro de egreso, roles, dashboards, exportación Excel).
+- El usuario `empleado` (no precargado en el seed) se crea vía API en un hook `before()`.
+
+```bash
+cd cypress
+npx cypress open    # modo interactivo
+npx cypress run     # modo headless
+```
+
+### Rendimiento — JMeter
+
+- Test plan con **4 thread groups**: Load, Stress, Spike y Soak.
+- Responsable: Ruth Manriquez.
+
+### Seguridad — OWASP ZAP
+
+- Escaneo contra `http://localhost:5173`, cubriendo 4 puntos del OWASP Top 10.
+- Responsable: Camila Liedo.
+
+### Resumen de cobertura automatizada
+
+| Tipo | Herramienta | Cantidad | Responsable |
+|---|---|---|---|
+| Unitarias | Vitest | 218 tests / 11 archivos | Josafat |
+| Integración | Supertest | 4 suites | Josafat |
+| E2E | Cypress | 8 flujos | Josafat / Ruth |
+| Rendimiento | JMeter | 4 thread groups | Ruth |
+| Seguridad | OWASP ZAP | 4 puntos OWASP Top 10 | Camila |
+| Accesibilidad | WCAG 2.1 + compatibilidad navegadores | — | Camila |
+
+---
+
+## 📋 Logging
+
+Logging estructurado en formato JSON con **Pino** + **pino-http**, integrado como middleware en `app.js`.
+
+- **`backend/src/utils/logger.js`**: instancia central de Pino. Centralizar el logging detrás de este único archivo permite cambiar la implementación (por ejemplo, migrar a un servicio externo) sin tocar los controladores.
+- **`correlationId`**: generado por request con `crypto.randomUUID()`, permite rastrear una petición a través de todos sus logs.
+- **Redacción de campos sensibles**: passwords, tokens y headers de autorización nunca se escriben en los logs.
+- **Cobertura**: integrado en 8 controladores (`auth`, `ventas`, `clientes`, `egresos`, `pagos`, `dashboard`, `productos`, `users`), cada uno registrando intentos, éxitos, warnings y errores junto con `correlationId`, `userId` y un campo `action` para trazabilidad.
+- **Métricas RED** (`backend/src/utils/metrics.js`): rate, errors y duration por endpoint usando únicamente `process.hrtime.bigint` (sin dependencias nuevas), expuestas en `GET /api/metrics`.
 
 ---
 
@@ -475,6 +594,7 @@ hilos-app/
 - Middleware `soloAdmin` y `adminOEmpleado` aplicado por ruta.
 - CORS configurable vía `.env`.
 - Cambia `JWT_SECRET` en producción.
+- Validado adicionalmente con OWASP ZAP (ver sección de Testing).
 
 ---
 
@@ -484,6 +604,18 @@ hilos-app/
 - El estado `inactivo` de un cliente se recalcula automáticamente al consultar la lista (sin cron).
 - Las ventas pueden tener varias líneas (`detalles_nota`); el descuento puede venir del cliente (global), de la nota (manual) o del cruce volumen × tipo de hilo.
 - La paleta clara está pensada para evitar fatiga visual en uso prolongado.
+
+---
+
+## 🌐 Despliegue
+
+| Componente | Plataforma | URL |
+|---|---|---|
+| Frontend | Netlify | `https://calidad-hilos.netlify.app` |
+| Backend | DigitalOcean App Platform | — |
+| MongoDB | MongoDB Atlas | — |
+
+> La base SQLite se mantiene versionada en el repositorio para conservar los datos de seed entre despliegues.
 
 ---
 
@@ -497,6 +629,8 @@ hilos-app/
 - **MongoDB** (mongoose 8)
 - **bcryptjs** para hashing
 - **xlsx** para exportación
+- **Pino** + pino-http para logging estructurado
+- **Vitest** (unit) · **Supertest** (integration) · **Cypress** + cypress-axe (E2E) · **JMeter** (rendimiento) · **OWASP ZAP** (seguridad)
 
 ---
 
